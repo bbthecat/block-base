@@ -1,0 +1,995 @@
+:root {
+  /* ป้ายสถานี: เส้นดำหนาแบ่งพื้นที่ ไม่มีการ์ดลอย ไม่มีเงา เหลืองใช้กับ "ตอนนี้" เท่านั้น */
+  --ground: #ecebe6;
+  --rail: #f6f5f1;
+  --panel: #ffffff;
+  --rule: #111111; /* เส้นแบ่งหลัก 2px */
+  --hair: #d6d4cc; /* เส้นแบ่งรอง 1px */
+  --ink: #111111;
+  --ink-2: #3a3935;
+  --ink-3: #6b6a63;
+  --ink-4: #9a988f;
+  --strip-ink: #bdbdb6;
+
+  --modify: #2346c8;
+  --use: #0f9d8a;
+  --use-ink: #0b6a5d;
+  --create: #7a4fd6;
+  --now: #ffc727;
+  --now-wash: #fff3c4;
+  --red: #d93a40;
+  --red-ink: #a3242a;
+  --red-wash: #fde8e9;
+  --warn: #9a6a00;
+  --select-wash: #e8eefc;
+  /* สีสายของช่วงบทเรียนปัจจุบัน ทาเต็มแถบหัวและเส้นสถานี (เข้มพอให้ตัวขาวอ่านได้ ≥4.5:1) */
+  --line: var(--modify);
+
+  --console: #111111;
+  --console-line: #333333;
+  --console-ink: #f2f2ee;
+
+  --sans: 'Noto Sans Thai Variable', 'Noto Sans Thai', system-ui, sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, monospace;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font: 15px/1.55 var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+::selection {
+  background: var(--now);
+  color: var(--ink);
+}
+:focus-visible {
+  outline: 3px solid var(--modify);
+  outline-offset: 2px;
+}
+h1,
+h2,
+h3,
+p,
+ol,
+ul {
+  margin: 0;
+}
+button {
+  font: inherit;
+  color: inherit;
+}
+code {
+  font: 13px var(--mono);
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+.icon {
+  flex: none;
+}
+
+/* ---------- โครงหน้าจอ ---------- */
+.app[data-stage='use'] {
+  --line: #0b7a6b;
+}
+.app[data-stage='create'] {
+  --line: #6a3fc4;
+}
+.app {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  height: 100%;
+}
+.main {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr) minmax(400px, 520px);
+  min-height: 0;
+  border-top: 2px solid var(--rule);
+}
+
+/* แถบหัว: ป้ายสีดำของสถานี */
+.top {
+  display: flex;
+  align-items: stretch;
+  min-height: 64px;
+  background: var(--line);
+  color: #fff;
+  transition: background-color 0.4s var(--ease);
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 22px;
+  border-right: 2px solid rgb(255 255 255 / 0.22);
+  font-weight: 800;
+  font-size: 20px;
+  font-stretch: 75%;
+  white-space: nowrap;
+}
+.mark {
+  display: grid;
+  place-items: center;
+}
+.divider {
+  display: none;
+}
+.crumb {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  padding: 0 22px;
+  white-space: nowrap;
+}
+.crumb b {
+  font-size: 20px;
+  font-weight: 700;
+  font-stretch: 75%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.stage-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 10px;
+  background: #fff;
+  color: var(--line);
+  font-size: 14px;
+  font-weight: 800;
+}
+.spacer {
+  flex: 1;
+}
+.tools {
+  display: flex;
+}
+
+/* ---------- ปุ่ม: เหลี่ยม ไม่มีเงา ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 48px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.15s, color 0.15s;
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.top .btn {
+  height: auto;
+}
+.btn.primary {
+  padding: 0 30px;
+  background: var(--now);
+  color: var(--ink);
+  font-size: 18px;
+  font-weight: 800;
+  font-stretch: 80%;
+}
+.btn.primary:hover:not(:disabled) {
+  background: #ffd552;
+}
+.btn.primary.stop {
+  background: var(--red);
+  color: #fff;
+}
+.btn.ghost {
+  padding: 0 20px;
+  border-left: 2px solid rgb(255 255 255 / 0.22);
+  color: #fff;
+  font-weight: 600;
+}
+.btn.ghost:hover {
+  background: rgb(0 0 0 / 0.18);
+}
+.top .btn:focus-visible {
+  outline-color: var(--now);
+  outline-offset: -4px;
+}
+.btn.outline {
+  border: 2px solid var(--rule);
+  background: var(--panel);
+  color: var(--ink);
+}
+.btn.outline:hover:not(:disabled) {
+  background: var(--ink);
+  color: #fff;
+}
+.btn.text {
+  border: 2px solid var(--rule);
+  background: var(--panel);
+  color: var(--ink-3);
+  font-weight: 600;
+}
+.btn.text:hover {
+  color: var(--ink);
+}
+.btn.small {
+  height: 36px;
+  padding: 0 14px;
+  font-size: 14px;
+}
+
+/* ---------- หัวแผง: แถบดำตัวขาว ---------- */
+.panel-head {
+  display: flex;
+  align-items: stretch;
+  min-height: 44px;
+  border-bottom: 2px solid var(--rule);
+}
+.panel-title {
+  display: flex;
+  align-items: center;
+  padding: 0 18px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  font-stretch: 85%;
+}
+
+/* ---------- เส้นทางบทเรียน ---------- */
+.rail {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--rail);
+  border-right: 2px solid var(--rule);
+}
+.route-card > .panel-title {
+  min-height: 40px;
+}
+.route {
+  display: flex;
+  flex-direction: column;
+  padding: 18px 18px 10px;
+}
+.segment {
+  --seg: var(--modify);
+  position: relative;
+  padding-left: 36px;
+}
+.segment.use {
+  --seg: var(--use);
+}
+.segment.create {
+  --seg: var(--create);
+}
+/* เส้นทางหนา 8px ต่อเนื่องข้ามช่วง เปลี่ยนสีตามช่วง */
+.segment::before {
+  content: '';
+  position: absolute;
+  left: 7px;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  background: var(--seg);
+}
+.segment:first-child::before {
+  top: 30px;
+}
+.segment:last-child::before {
+  bottom: 22px;
+}
+.segment h3 {
+  padding-top: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  font-stretch: 85%;
+  color: var(--seg);
+}
+.segment.use h3 {
+  color: var(--use-ink);
+}
+.stop {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 40px;
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  font-size: 16px;
+  font-weight: 500;
+  font-stretch: 90%;
+  cursor: pointer;
+}
+.stop:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+/* วงกลมสถานีบนเส้นทาง */
+.stop::before {
+  content: '';
+  position: absolute;
+  left: -36px;
+  top: 9px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  border: 5px solid var(--seg);
+}
+.stop.done::before {
+  background: var(--seg);
+  border-color: var(--ink);
+}
+.stop.current {
+  font-weight: 800;
+}
+.stop.current::before {
+  background: var(--now);
+  border-color: var(--ink);
+}
+.passed {
+  margin-left: auto;
+  font: 700 12px var(--mono);
+  color: var(--ink-3);
+}
+
+.task {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: auto;
+  padding: 18px;
+  border-top: 2px solid var(--rule);
+  background: var(--panel);
+}
+.task h2 {
+  font-size: 26px;
+  font-weight: 800;
+  font-stretch: 75%;
+  line-height: 1.15;
+}
+.task .goal {
+  color: var(--ink-2);
+}
+.task ol {
+  list-style: none;
+  padding: 0;
+  border-top: 1px solid var(--hair);
+  counter-reset: step;
+}
+.task li {
+  display: flex;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--hair);
+  counter-increment: step;
+}
+.task li::before {
+  content: counter(step, decimal-leading-zero);
+  flex: none;
+  font: 800 13px/24px var(--mono);
+  color: var(--line);
+}
+.task-actions {
+  display: flex;
+}
+.task-actions .btn {
+  height: 48px;
+}
+.task-actions .btn + .btn {
+  border-left: 0;
+}
+.task-actions .btn.outline {
+  flex: 1;
+}
+.verdict {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+}
+.verdict.pass {
+  background: var(--use);
+  color: #fff;
+  font-size: 16px;
+}
+.verdict.fail {
+  background: var(--red-wash);
+  color: var(--red-ink);
+  box-shadow: inset 0 0 0 2px var(--red);
+}
+.verdict span {
+  margin-top: 4px;
+  font-size: 13px;
+}
+.verdict pre {
+  margin: 0;
+  padding: 6px 8px;
+  background: #fff;
+  color: var(--ink);
+  font: 13px/1.5 var(--mono);
+  white-space: pre-wrap;
+  max-height: 140px;
+  overflow: auto;
+}
+
+/* ---------- พื้นที่บล็อก ---------- */
+.card {
+  background: var(--panel);
+}
+.blocks {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.blocks > .panel-head {
+  border-bottom: 0;
+}
+.blockly-host {
+  position: relative;
+  min-height: 0;
+  background-color: #fff;
+}
+.blockly-host .blocklyToolboxDiv {
+  padding: 0 !important;
+  border-top: 0;
+  border-bottom: 2px solid var(--rule);
+}
+.blockly-host .blocklyToolboxContents {
+  flex-wrap: wrap;
+}
+.blockly-host .blocklyTreeRow {
+  --c: var(--ink-3);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  margin: 0 !important;
+  padding: 0 14px !important;
+  border: 0 !important;
+  border-right: 1px solid var(--hair) !important;
+  border-radius: 0;
+  background: var(--panel) !important;
+}
+.blockly-host .blocklyTreeRow::before {
+  content: '';
+  flex: none;
+  width: 10px;
+  height: 10px;
+  background: var(--c);
+}
+.blockly-host .blocklyTreeRow:hover {
+  background: var(--rail) !important;
+}
+.cat-variable { --c: #b0306a !important; }
+.cat-io { --c: #2856c9 !important; }
+.cat-text { --c: #0e7266 !important; }
+.cat-math { --c: #4a4fc4 !important; }
+.cat-logic { --c: #8f5400 !important; }
+.cat-loop { --c: #1f7a4f !important; }
+.cat-func { --c: #6a3fc4 !important; }
+.cat-data { --c: #a8481c !important; }
+.blockly-host .blocklyTreeLabel,
+.blockly-host .blocklyToolboxCategoryLabel {
+  font: 600 14px var(--sans);
+  color: var(--ink);
+}
+.blockly-host .blocklyTreeSelected {
+  background: var(--ink) !important;
+}
+.blockly-host .blocklyTreeSelected .blocklyTreeLabel {
+  color: #fff;
+}
+.blockly-host .blocklyText,
+.blockly-host .blocklyHtmlInput {
+  font-family: var(--mono) !important;
+}
+.blocklyWidgetDiv .blocklyMenu,
+.blocklyDropDownDiv {
+  font-family: var(--sans);
+}
+.blockly-host .mark-error > .blocklyPath {
+  stroke: var(--red);
+  stroke-width: 3px;
+}
+.blockly-host .mark-warning > .blocklyPath {
+  stroke: var(--warn);
+  stroke-width: 3px;
+  stroke-dasharray: 6 4;
+}
+
+/* โค้ดมี syntax error: ล็อกพื้นที่บล็อก ไม่ให้บล็อกเก่าไปเขียนทับโค้ด */
+.stale-lock {
+  position: absolute;
+  inset: 44px 0 0;
+  z-index: 80; /* อยู่เหนือ toolbox ของ Blockly (z-index 70) */
+  display: grid;
+  place-items: center;
+  background: rgb(236 235 230 / 0.85);
+  backdrop-filter: grayscale(1);
+}
+.stale-lock p {
+  padding: 14px 20px;
+  background: var(--panel);
+  box-shadow: inset 0 0 0 2px var(--red);
+  text-align: center;
+  font-weight: 700;
+  color: var(--red-ink);
+}
+
+/* ---------- โค้ดและผลลัพธ์ ---------- */
+.right {
+  display: grid;
+  grid-template-rows: minmax(0, 1.2fr) minmax(0, 1fr);
+  min-height: 0;
+  border-left: 2px solid var(--rule);
+}
+.code-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-height: 0;
+  overflow: hidden;
+}
+.lint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  padding: 0 16px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.lint::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  background: currentColor;
+}
+.lint.clean {
+  color: var(--use-ink);
+}
+.lint.has-warning {
+  color: var(--warn);
+}
+.lint.has-error {
+  color: var(--red-ink);
+}
+.code-host {
+  min-height: 0;
+  overflow: hidden;
+}
+.code-host .cm-editor {
+  height: 100%;
+  font: 15px/34px var(--mono);
+}
+.code-host .cm-editor.cm-focused {
+  outline: none;
+}
+.code-host .cm-scroller {
+  font: inherit;
+  line-height: 34px;
+}
+.code-host .cm-content {
+  padding: 12px 0;
+  caret-color: var(--ink);
+}
+.code-host .cm-cursor {
+  border-left: 2px solid var(--ink);
+}
+.code-host .cm-selectionBackground,
+.code-host .cm-focused .cm-selectionBackground {
+  background: var(--select-wash) !important;
+}
+.code-host .cm-gutters {
+  background: var(--panel);
+  border: 0;
+}
+
+/* เส้นทางสถานีแทนเลขบรรทัด */
+.route-gutter {
+  width: 86px;
+  background: linear-gradient(var(--line), var(--line)) no-repeat 26px 0 / 6px 100%;
+}
+.route-gutter .cm-gutterElement {
+  position: relative;
+}
+.station {
+  display: block;
+  height: 34px;
+}
+.station i {
+  position: absolute;
+  left: 19px;
+  top: 7px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  border: 5px solid var(--line);
+  transition: transform 0.25s var(--ease), background-color 0.2s;
+}
+.station em {
+  position: absolute;
+  left: 52px;
+  font: 800 12px/34px var(--mono);
+  font-style: normal;
+  color: var(--ink-4);
+  font-variant-numeric: tabular-nums;
+}
+.station.visited i {
+  background: var(--line);
+  border-color: var(--ink);
+}
+.station.now i {
+  background: var(--now);
+  border-color: var(--ink);
+  transform: scale(1.2);
+}
+.station.stopped i {
+  background: var(--red);
+  border-color: var(--ink);
+  transform: scale(1.2);
+}
+.station.error em {
+  color: var(--red-ink);
+}
+.station.warning em {
+  color: var(--warn);
+}
+
+.code-host .cm-line {
+  background-image: repeating-linear-gradient(to right, var(--hair) 0 1px, transparent 1px 4ch);
+  background-size: calc(var(--ind, 0) * 4ch) 100%;
+  background-repeat: no-repeat;
+  background-position: 6px 0;
+  transition: background-color 0.25s, opacity 0.2s;
+}
+.code-host .ln-now {
+  background-color: var(--now-wash);
+  font-weight: 600;
+}
+.code-host .ln-stopped {
+  background-color: var(--red-wash);
+}
+.code-host .ln-changed {
+  background-color: var(--now-wash);
+}
+.code-host .ln-selected {
+  background-color: var(--select-wash);
+}
+.code-host .ln-dim {
+  opacity: 0.45;
+}
+/* สถานะบอกด้วยรูปเส้น: error เส้นทึบ, warning เส้นประ */
+.code-host .ln-error {
+  text-decoration: underline solid var(--red) 2px;
+  text-underline-offset: 6px;
+}
+.code-host .ln-warning {
+  text-decoration: underline dashed var(--warn) 2px;
+  text-underline-offset: 6px;
+}
+
+.diags {
+  list-style: none;
+  padding: 0;
+  max-height: 140px;
+  overflow-y: auto;
+  border-top: 2px solid var(--rule);
+}
+.diags li + li {
+  border-top: 1px solid var(--hair);
+}
+.diags button {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 16px;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  font-size: 14px;
+}
+.diags button:hover {
+  background: var(--rail);
+}
+.diags .at {
+  flex: none;
+  padding: 0 8px;
+  background: var(--red);
+  color: #fff;
+  font: 700 12px/22px var(--mono);
+}
+.diags .warning .at {
+  background: none;
+  color: var(--warn);
+  box-shadow: inset 0 0 0 2px var(--warn);
+}
+
+.console {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  overflow: hidden;
+  border-top: 2px solid var(--rule);
+  background: var(--console);
+  color: var(--console-ink);
+}
+.console .panel-head {
+  border-bottom: 1px solid var(--console-line);
+}
+.console .panel-title {
+  color: var(--strip-ink);
+}
+.console .btn.text {
+  height: auto;
+  margin-left: auto;
+  border: 0;
+  border-left: 1px solid var(--console-line);
+  background: none;
+  color: var(--strip-ink);
+}
+.console .btn.text:hover {
+  color: #fff;
+}
+.console-body {
+  overflow-y: auto;
+  padding: 16px 18px;
+}
+.console-body pre {
+  margin: 0;
+  font: 16px/1.6 var(--mono);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.console-body .echo {
+  color: var(--now);
+}
+.console-body .stderr {
+  color: #ffb3b6;
+}
+.console .empty {
+  color: var(--strip-ink);
+}
+.console-body.outdated pre {
+  opacity: 0.4;
+}
+.input-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+.input-line label {
+  font-size: 13px;
+  color: var(--strip-ink);
+  white-space: nowrap;
+}
+.input-line input {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  padding: 0 12px;
+  border: 2px solid var(--now);
+  border-radius: 0;
+  background: #1c1c1c;
+  color: var(--console-ink);
+  font: 15px var(--mono);
+}
+.input-line input:focus {
+  outline: 2px solid var(--now);
+  outline-offset: 2px;
+}
+.input-line .btn {
+  height: 40px;
+  padding: 0 16px;
+  font-size: 15px;
+}
+.run-error {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  background: #2a1414;
+  box-shadow: inset 0 0 0 2px var(--red);
+}
+.run-error.neutral {
+  background: #1c1c1c;
+  box-shadow: inset 0 0 0 2px var(--console-line);
+}
+.run-error .what {
+  color: #f6dcdc;
+}
+.run-error .at {
+  display: inline-block;
+  margin-right: 10px;
+  padding: 0 8px;
+  background: var(--red);
+  color: #fff;
+  font: 700 12px/22px var(--mono);
+}
+.run-error details {
+  color: var(--strip-ink);
+}
+.run-error summary {
+  cursor: pointer;
+  font-size: 13px;
+}
+.run-error details pre {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #ffb3b6;
+}
+
+/* ---------- จอแคบ: ซ้อนแนวตั้ง ---------- */
+@media (max-width: 1100px) {
+  .main {
+    grid-template-columns: 280px minmax(0, 1fr);
+    grid-template-rows: minmax(460px, 1fr) minmax(480px, auto);
+  }
+  .right {
+    grid-column: 1 / -1;
+    border-left: 0;
+    border-top: 2px solid var(--rule);
+  }
+  .app {
+    height: auto;
+    min-height: 100%;
+  }
+  .top {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+}
+@media (max-width: 720px) {
+  .main {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 480px auto;
+  }
+  .rail {
+    border-right: 0;
+    border-bottom: 2px solid var(--rule);
+  }
+  .crumb,
+  .tools {
+    display: none;
+  }
+  .brand {
+    flex: 1;
+    border-right: 0;
+  }
+  .right {
+    grid-template-rows: minmax(320px, auto) minmax(240px, auto);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}
+.route-card {
+  background: none;
+}
+.crumb .lesson-no {
+  font: 600 13px var(--mono);
+  color: rgb(255 255 255 / 0.75);
+}
+/* ปิด ligature ของ JetBrains Mono: ผู้เรียนต้องเห็น >= และ == ตามที่พิมพ์จริง ไม่ใช่ ≥ */
+.code-host .cm-editor,
+.blockly-host .blocklyText,
+.blockly-host .blocklyHtmlInput,
+.console-body pre,
+.verdict pre,
+code {
+  font-variant-ligatures: none;
+}
+/* ถึงปลายทาง: แถบทองวิ่งผ่านการ์ดผลตรวจหนึ่งครั้ง */
+.verdict.pass {
+  position: relative;
+  overflow: hidden;
+  animation: arrive 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.verdict.pass::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 4px;
+  background: var(--now);
+  transform-origin: left;
+  animation: track 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes arrive {
+  from {
+    transform: translateY(6px);
+    opacity: 0;
+  }
+}
+@keyframes track {
+  from {
+    transform: scaleX(0);
+  }
+}
+.route-card .export {
+  margin: 4px 0 0 18px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink-3);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .verdict.pass,
+  .verdict.pass::after {
+    animation: none;
+  }
+}
+/* แผงค่าตัวแปร ณ สถานีที่ขบวนจอด */
+.console:has(> .vars) {
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+.vars {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--console-line);
+  font: 13px/1.4 var(--mono);
+  color: rgb(255 255 255 / 0.85);
+  max-height: 96px;
+  overflow: auto;
+}
+.vars .scope {
+  font: 600 12px var(--sans);
+  color: rgb(255 255 255 / 0.55);
+}
+.vars .none {
+  color: rgb(255 255 255 / 0.45);
+}
+.vars b {
+  font-weight: 600;
+  color: #fff;
+}
+.vars code {
+  font-variant-ligatures: none;
+}
+.vars .var.fresh {
+  padding: 0 6px;
+  background: var(--now);
+  color: #1a1400;
+}
+.vars .var.fresh b {
+  color: inherit;
+}
