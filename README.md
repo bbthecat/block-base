@@ -1,54 +1,40 @@
-# React + TypeScript + Vite
+# สมุดฝึก Python (A Block-Based Python Learning Environment)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+ระบบสนับสนุนการเรียนรู้การเขียนโปรแกรมภาษา Python ด้วยบล็อกคำสั่ง
+โครงงานรายวิชา CP353761 สัมมนาทางวิทยาการคอมพิวเตอร์ สาขาวิชาวิทยาการคอมพิวเตอร์ วิทยาลัยการคอมพิวเตอร์ มหาวิทยาลัยขอนแก่น
 
-Currently, two official plugins are available:
+## ความสามารถ
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- แปลงบล็อกคำสั่ง ⇄ โค้ด Python ได้สองทิศทางแบบเรียลไทม์ โดยใช้ AST เป็นโครงสร้างกลาง
+- คลิกบล็อกหรือบรรทัดโค้ดแล้วอีกฝั่งไฮไลต์ตาม พร้อมคำอธิบายภาษาไทยของบรรทัดนั้น
+- โค้ดที่อยู่นอกขอบเขต (เช่น class, import) แสดงเป็นบล็อกโค้ด ส่วนโค้ดที่ไวยากรณ์ยังผิดแสดงเป็นบล็อกสีแดง ส่วนที่เหลือยังแปลงเป็นบล็อกได้
+- ตรวจข้อผิดพลาดเบื้องต้นเป็นภาษาไทย: ไวยากรณ์, ตัวแปรที่ยังไม่กำหนดค่า, ชนิดข้อมูลไม่ตรงกัน, โครงสร้างไม่สมบูรณ์
+- รันโค้ดในเบราว์เซอร์ด้วย Pyodide (Web Worker) รองรับ `input()` แบบโต้ตอบ
+- บทเรียน 9 บทตามลำดับ Use → Modify → Create และหน้าว่างสำหรับเขียนอิสระ
+- บันทึกการใช้งาน (Log Data) ไว้ในเครื่องผู้เรียน ส่งออกเป็นไฟล์ JSON พร้อมรหัสผู้เข้าร่วม
 
-## Expanding the ESLint configuration
+## เครื่องมือ
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+React + TypeScript + Vite, Blockly, CodeMirror 6, web-tree-sitter (tree-sitter-python), Pyodide, Vitest
 
-```js
-export default tseslint.config({
-  extends: [
-    // Remove ...tseslint.configs.recommended and replace with this
-    ...tseslint.configs.recommendedTypeChecked,
-    // Alternatively, use this for stricter rules
-    ...tseslint.configs.strictTypeChecked,
-    // Optionally, add this for stylistic rules
-    ...tseslint.configs.stylisticTypeChecked,
-  ],
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
+## การใช้งาน
+
+```bash
+npm install
+npm run dev      # เปิดที่ http://localhost:5173
+npm test         # ทดสอบการแปลงไป-กลับ (round-trip) และตัวตรวจข้อผิดพลาด
+npm run build    # สร้างไฟล์สำหรับ deploy ไว้ที่ dist/
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Deploy
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+ใช้ Vercel (ตั้งค่าไว้ใน `vercel.json`) ระบบต้องส่ง header
+`Cross-Origin-Opener-Policy: same-origin` และ `Cross-Origin-Embedder-Policy: require-corp`
+เพื่อให้ `input()` รอผู้ใช้พิมพ์ได้
 
-export default tseslint.config({
-  plugins: {
-    // Add the react-x and react-dom plugins
-    'react-x': reactX,
-    'react-dom': reactDom,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended typescript rules
-    ...reactX.configs['recommended-typescript'].rules,
-    ...reactDom.configs.recommended.rules,
-  },
-})
-```
+## ผู้จัดทำ
+
+- 673380582-6 นายณัฐชา อรรคฮาต
+- 673380599-9 นายรัชชานนท์ ประดับแก้ว
+
+อาจารย์ที่ปรึกษา: อ.ธนพล ตั้งชูพงศ์

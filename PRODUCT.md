@@ -8,7 +8,7 @@ web
 
 ## Stack
 
-delegated: React + TypeScript + Vite, Blockly (block editor), CodeMirror 6 (code view), web-tree-sitter + tree-sitter-python (parser), Pyodide in a Web Worker (runtime), Vitest (round-trip tests). Fully client-side, no server, deployable to free static hosting. Chosen by Claude; the team (2 students) left the choice open.
+React + TypeScript + Vite, Blockly (block editor), CodeMirror 6 (code view), web-tree-sitter + tree-sitter-python (parser), Pyodide in a Web Worker (runtime), Vitest (round-trip tests). Fully client-side, no server, deployable to free static hosting (Vercel).
 
 ## Users
 
@@ -38,7 +38,6 @@ Seminar project CP353761, Computer Science, College of Computing, KKU, academic 
 - One screen shows Block View, Python Code View, Output, and Error Message together.
 - UI language: Thai; Python keywords and block text stay in real Python syntax.
 - Budget: 3,000 THB total; no paid services.
-- Current build is a throwaway spike to explore direction.
 
 ## Evidence on Hand
 
