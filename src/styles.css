@@ -1244,3 +1244,135 @@ body {
 .pid-actions .btn.primary {
   border: 2px solid var(--ink);
 }
+
+/* ---------- โหมดแข่ง ---------- */
+.race {
+  flex: 1 1 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.race.lobby {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+.race-box {
+  flex: 1 1 300px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 12px;
+  padding: 12px 14px;
+  border: 2px dashed var(--fold);
+  border-radius: 8px;
+}
+.race-box h2 {
+  flex: 1 1 100%;
+  font: 400 20px var(--hand);
+}
+.race-box label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+  color: var(--ink-3);
+}
+.race-box input,
+.race-box select {
+  height: 40px;
+  padding: 0 10px;
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+  background: #fff;
+  font: inherit;
+  color: var(--ink);
+}
+.race-box .code-input {
+  width: 110px;
+  font: 600 20px var(--mono);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+}
+.race-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+.race-code {
+  padding: 2px 14px;
+  border-radius: 6px;
+  background: var(--ink);
+  color: var(--panel);
+  font: 600 30px var(--mono);
+  letter-spacing: 6px;
+}
+.race-state {
+  display: flex;
+  flex-direction: column;
+}
+.race-state span {
+  font-size: 15px;
+  color: var(--ink-3);
+}
+.race-state .timer {
+  font: 600 22px var(--mono);
+  color: var(--ink);
+}
+.board {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0;
+  list-style: none;
+}
+.board li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px 4px 4px;
+  border-radius: 20px;
+  background: #f1ede2;
+  font-size: 15px;
+}
+.board li.done {
+  background: #d6efe6;
+}
+.board li.me {
+  box-shadow: inset 0 0 0 2px var(--ink);
+}
+.board .rank {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--panel);
+  font: 600 13px var(--mono);
+}
+.board li.done:nth-child(1) .rank {
+  background: var(--now);
+}
+.board .time {
+  font: 13px var(--mono);
+  color: var(--ink-3);
+}
+.race-error {
+  flex: 1 1 100%;
+  color: #a3242a;
+}
+.main {
+  position: relative;
+}
+.race-lock {
+  position: absolute;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  background: rgb(253 251 243 / 0.92);
+}
+.race-lock p {
+  font: 400 24px var(--hand);
+  color: var(--ink-2);
+}

@@ -10,6 +10,7 @@ import { validate } from './core/validate'
 import { explain } from './explain'
 import { Icon } from './Icon'
 import { LESSONS, STAGE_LABEL, type Lesson, type Stage } from './lessons'
+import { RacePanel, useRace } from './Race'
 import { PythonRunner, type RunError, type Vars } from './runner'
 
 const BASE = import.meta.env.BASE_URL
@@ -184,14 +185,14 @@ export default function App() {
 
   // ---------------- โหลดบทเรียน ----------------
   const openLesson = useCallback(
-    (l: Lesson) => {
+    (l: Lesson, fresh = false) => {
       setLesson(l)
       lessonId.current = l.id
       if (l.id !== 'sandbox') lastExercise.current = l
       lastSide.current = null
       store.set('last', l.id)
       track('open', { lesson: l.id })
-      const src = store.get('code:' + l.id) ?? l.starter
+      const src = (fresh ? null : store.get('code:' + l.id)) ?? l.starter
       setCode(src)
       setOut([])
       setCheck(null)
@@ -212,9 +213,27 @@ export default function App() {
     })
   }, [openLesson])
 
+  // ระหว่างแข่งเริ่มจากโค้ดตั้งต้นเสมอ ไม่เขียนทับงานที่ฝึกไว้ในบทเดียวกัน
+  const [raceOn, setRaceOn] = useState(() => {
+    try {
+      return !!localStorage.getItem('saphan:race')
+    } catch {
+      return false
+    }
+  })
+  const race = useRace({
+    enabled: ready,
+    passed: raceOn && !!check?.ok,
+    onStart: (id) => {
+      const l = LESSONS.find((x) => x.id === id)
+      if (l) openLesson(l, true)
+    },
+    log: track,
+  })
+
   useEffect(() => {
-    if (ready) store.set('code:' + lesson.id, code)
-  }, [code, lesson.id, ready])
+    if (ready && !raceOn) store.set('code:' + lesson.id, code)
+  }, [code, lesson.id, ready, raceOn])
 
   // ---------------- เลือกคู่บล็อก ⇄ บรรทัด ----------------
   const onSelectBlock = useCallback((id: string | null) => {
@@ -393,7 +412,8 @@ export default function App() {
   const picked = selected && mod.current ? flatten(mod.current.body).find((s) => s.span?.startLine === selected[0]) : undefined
   const sandbox = LESSONS.find((l) => l.id === 'sandbox')!
   const exercises = LESSONS.filter((l) => l !== sandbox)
-  const inSandbox = lesson === sandbox
+  const inSandbox = lesson === sandbox && !raceOn
+  const raceLocked = raceOn && (!race.room || (race.room.role === 'player' && (race.view?.status ?? 'lobby') === 'lobby'))
   const idx = exercises.indexOf(lesson)
   const prev = exercises[idx - 1]
   const next = exercises[idx + 1]
@@ -413,14 +433,31 @@ export default function App() {
       <header className="top">
         <div className="brand">สมุดฝึก Python</div>
         <nav className="modes" aria-label="โหมด">
-          <button className={'mode' + (inSandbox ? '' : ' on')} aria-pressed={!inSandbox} onClick={() => openLesson(lastExercise.current ?? exercises[0])}>
+          <button
+            className={'mode' + (!inSandbox && !raceOn ? ' on' : '')}
+            aria-pressed={!inSandbox && !raceOn}
+            onClick={() => {
+              setRaceOn(false)
+              openLesson(lastExercise.current ?? exercises[0])
+            }}
+          >
             แบบฝึกหัด
           </button>
-          <button className={'mode' + (inSandbox ? ' on' : '')} aria-pressed={inSandbox} onClick={() => openLesson(sandbox)}>
+          <button
+            className={'mode' + (inSandbox ? ' on' : '')}
+            aria-pressed={inSandbox}
+            onClick={() => {
+              setRaceOn(false)
+              openLesson(sandbox)
+            }}
+          >
             หน้าว่าง
           </button>
+          <button className={'mode' + (raceOn ? ' on' : '')} aria-pressed={raceOn} onClick={() => setRaceOn(true)}>
+            แข่งกัน
+          </button>
         </nav>
-        {!inSandbox && (
+        {!inSandbox && !raceOn && (
           <>
             <div className="picker">
               <button className="step-btn" aria-label="บทก่อนหน้า" disabled={!prev} onClick={() => prev && openLesson(prev)}>
@@ -471,6 +508,9 @@ export default function App() {
       </header>
 
       <section className="task" aria-label="โจทย์">
+        {raceOn && <RacePanel race={race} lessons={exercises.filter((l) => l.tests)} defaultName={pid ?? ''} />}
+        {!raceLocked && (
+          <>
         <div className="titles">
           <h1>{lesson.title}</h1>
           <p className="goal">{lesson.goal}</p>
@@ -489,7 +529,7 @@ export default function App() {
               <Icon name="check" /> {checking ? 'กำลังตรวจ…' : 'ตรวจคำตอบ'}
             </button>
           )}
-          {check?.ok && next && (
+          {check?.ok && next && !raceOn && (
             <button className="btn primary small" onClick={() => openLesson(next)}>
               บทถัดไป →
             </button>
@@ -527,9 +567,16 @@ export default function App() {
             )}
           </div>
         )}
+          </>
+        )}
       </section>
 
       <div className="main">
+        {raceLocked && (
+          <div className="race-lock" role="status">
+            <p>{race.room ? 'โจทย์จะเปิดเมื่อผู้สอนกดเริ่มแข่ง' : 'เข้าห้องหรือสร้างห้องด้านบนก่อนนะ'}</p>
+          </div>
+        )}
         <section className="card blocks" aria-label="บล็อกคำสั่ง">
           <div className="panel-head">
             <h2 className="panel-title">บล็อก</h2>
