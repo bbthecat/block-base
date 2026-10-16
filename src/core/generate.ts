@@ -1,6 +1,6 @@
 // AST → ซอร์สโค้ด Python
 // ใส่วงเล็บตามลำดับความสำคัญของตัวดำเนินการ (precedence) จาก AST ไม่ใช่จากข้อความเดิม
-import { HOLE_NAME, type Expr, type Module, type Stmt } from './ast'
+import { HOLE_NAME, reindentRaw, type Expr, type Module, type Stmt } from './ast'
 
 const INDENT = '    '
 
@@ -149,6 +149,9 @@ export function generate(mod: Module): string {
         break
       case 'Pass':
         lines.push(pad + 'pass')
+        break
+      case 'Raw':
+        lines.push(...reindentRaw(s, pad))
         break
     }
     s.span = { startLine: start, endLine: lines.length }

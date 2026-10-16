@@ -1,7 +1,7 @@
-// นิยามบล็อก Blockly ที่อ่านแล้วหน้าตาเหมือนไวยากรณ์ Python จริง
+// นิยามบล็อก Blockly: คำอธิบายภาษาไทยคู่กับคำสั่ง Python จริง
 // และตัวแปลง Blocks ⇄ AST
 import * as Blockly from 'blockly/core'
-import type { BinOperator, CmpOperator, Expr, Module, Stmt } from './ast'
+import { reindentRaw, type BinOperator, type CmpOperator, type Expr, type Module, type Stmt } from './ast'
 
 export const COLORS = {
   // เข้มพอให้ตัวอักษรขาวบนบล็อกอ่านได้ (≥4.5:1)
@@ -13,6 +13,8 @@ export const COLORS = {
   math: '#4a4fc4',
   text: '#0e7266',
   data: '#a8481c',
+  raw: '#55534d',
+  broken: '#a3242a',
 } as const
 
 const icon = (sign: '+' | '−') =>
@@ -83,6 +85,7 @@ const BIN_OPS: [string, BinOperator][] = [['+', '+'], ['-', '-'], ['*', '*'], ['
 const CMP_OPS: [string, CmpOperator][] = [['==', '=='], ['!=', '!='], ['<', '<'], ['<=', '<='], ['>', '>'], ['>=', '>='], ['in', 'in'], ['not in', 'not in']]
 
 type IfBlock = Blockly.Block & { elifCount: number; hasElse: boolean; updateShape(): void }
+type RawBlock = Blockly.Block & { code: string; indent: number; reason: string; broken: boolean; updateShape(): void }
 
 let registered = false
 export function registerBlocks() {
@@ -93,7 +96,7 @@ export function registerBlocks() {
     // ---------- ตัวแปร ----------
     {
       type: 'py_assign',
-      message0: '%1 = %2',
+      message0: 'กำหนด %1 = %2',
       args0: [
         { type: 'field_input', name: 'VAR', text: 'x', spellcheck: false },
         { type: 'input_value', name: 'VALUE' },
@@ -126,7 +129,7 @@ export function registerBlocks() {
     },
     {
       type: 'py_subscript_assign',
-      message0: '%1 [ %2 ] = %3',
+      message0: 'กำหนด %1 [ %2 ] = %3',
       args0: [
         { type: 'input_value', name: 'TARGET' },
         { type: 'input_value', name: 'INDEX' },
@@ -191,7 +194,7 @@ export function registerBlocks() {
       message0: '%1 %2 %3',
       args0: [
         { type: 'input_value', name: 'A' },
-        { type: 'field_dropdown', name: 'OP', options: [['and', 'and'], ['or', 'or']] },
+        { type: 'field_dropdown', name: 'OP', options: [['และ and', 'and'], ['หรือ or', 'or']] },
         { type: 'input_value', name: 'B' },
       ],
       inputsInline: true,
@@ -200,7 +203,7 @@ export function registerBlocks() {
     },
     {
       type: 'py_not',
-      message0: 'not %1',
+      message0: 'ไม่ใช่ not %1',
       args0: [{ type: 'input_value', name: 'VALUE' }],
       output: 'Boolean',
       colour: COLORS.logic,
@@ -226,7 +229,7 @@ export function registerBlocks() {
     // ---------- การควบคุม ----------
     {
       type: 'py_while',
-      message0: 'while %1 :',
+      message0: 'ทำซ้ำขณะที่ while %1 :',
       args0: [{ type: 'input_value', name: 'COND' }],
       message1: '%1',
       args1: [{ type: 'input_statement', name: 'DO' }],
@@ -237,7 +240,7 @@ export function registerBlocks() {
     },
     {
       type: 'py_for',
-      message0: 'for %1 in %2 :',
+      message0: 'ทำซ้ำ for %1 in %2 :',
       args0: [
         { type: 'field_input', name: 'VAR', text: 'i', spellcheck: false },
         { type: 'input_value', name: 'ITER' },
@@ -249,13 +252,13 @@ export function registerBlocks() {
       colour: COLORS.loop,
       tooltip: 'ทำซ้ำกับสมาชิกแต่ละตัว เช่น for i in range(5)',
     },
-    { type: 'py_break', message0: 'break', previousStatement: null, colour: COLORS.loop, tooltip: 'ออกจากลูปทันที' },
-    { type: 'py_continue', message0: 'continue', previousStatement: null, colour: COLORS.loop, tooltip: 'ข้ามไปรอบถัดไปของลูป' },
-    { type: 'py_pass', message0: 'pass', previousStatement: null, nextStatement: null, colour: COLORS.loop, tooltip: 'คำสั่งที่ไม่ทำอะไร' },
+    { type: 'py_break', message0: 'ออกจากลูป break', previousStatement: null, colour: COLORS.loop, tooltip: 'ออกจากลูปทันที' },
+    { type: 'py_continue', message0: 'ข้ามรอบ continue', previousStatement: null, colour: COLORS.loop, tooltip: 'ข้ามไปรอบถัดไปของลูป' },
+    { type: 'py_pass', message0: 'ไม่ทำอะไร pass', previousStatement: null, nextStatement: null, colour: COLORS.loop, tooltip: 'คำสั่งที่ไม่ทำอะไร' },
     // ---------- ฟังก์ชัน ----------
     {
       type: 'py_def',
-      message0: 'def %1 ( %2 ) :',
+      message0: 'นิยามฟังก์ชัน def %1 ( %2 ) :',
       args0: [
         { type: 'field_input', name: 'NAME', text: 'my_function', spellcheck: false },
         { type: 'field_input', name: 'PARAMS', text: '', spellcheck: false },
@@ -269,7 +272,7 @@ export function registerBlocks() {
     },
     {
       type: 'py_return',
-      message0: 'return %1',
+      message0: 'คืนค่า return %1',
       args0: [{ type: 'input_value', name: 'VALUE' }],
       previousStatement: null,
       colour: COLORS.func,
@@ -291,7 +294,7 @@ export function registerBlocks() {
     min: 0,
     initial: 1,
     build(b) {
-      b.appendDummyInput().appendField('print (')
+      b.appendDummyInput().appendField('แสดงผล print (')
       b.setInputsInline(true)
       b.setPreviousStatement(true)
       b.setNextStatement(true)
@@ -342,7 +345,7 @@ export function registerBlocks() {
     min: 0,
     initial: 3,
     build(b) {
-      b.appendDummyInput().appendField('[')
+      b.appendDummyInput().appendField('รายการ [')
       b.setInputsInline(true)
       b.setOutput(true, 'List')
       b.setColour(COLORS.data)
@@ -357,7 +360,7 @@ export function registerBlocks() {
       min: 0,
       initial: 1,
       build(b) {
-        b.appendDummyInput().appendField('{')
+        b.appendDummyInput().appendField('พจนานุกรม {')
         b.setInputsInline(true)
         b.setOutput(true, 'Dict')
         b.setColour(COLORS.data)
@@ -396,7 +399,7 @@ export function registerBlocks() {
         saved.set(input.name, input.connection?.targetConnection ?? null)
         this.removeInput(input.name)
       }
-      const cond = this.appendValueInput('IF0').setCheck(null).appendField('if')
+      const cond = this.appendValueInput('IF0').setCheck(null).appendField('ถ้า if')
       cond.appendField(
         new Blockly.FieldImage(icon('+'), 16, 16, 'เพิ่ม elif', () => {
           this.elifCount++
@@ -406,7 +409,7 @@ export function registerBlocks() {
       this.appendDummyInput('COLON0').appendField(':')
       this.appendStatementInput('DO0')
       for (let i = 1; i <= this.elifCount; i++) {
-        const row = this.appendValueInput('IF' + i).appendField('elif')
+        const row = this.appendValueInput('IF' + i).appendField('มิฉะนั้นถ้า elif')
         if (i === this.elifCount)
           row.appendField(
             new Blockly.FieldImage(icon('−'), 16, 16, 'ลบ elif', () => {
@@ -419,7 +422,7 @@ export function registerBlocks() {
       }
       const elseRow = this.appendDummyInput('ELSE_LABEL')
       if (this.hasElse) {
-        elseRow.appendField('else :').appendField(
+        elseRow.appendField('มิฉะนั้น else :').appendField(
           new Blockly.FieldImage(icon('−'), 16, 16, 'ลบ else', () => {
             this.hasElse = false
             this.updateShape()
@@ -432,7 +435,7 @@ export function registerBlocks() {
             this.hasElse = true
             this.updateShape()
           }),
-        ).appendField('else')
+        ).appendField('มิฉะนั้น else')
       }
       this.setInputsInline(false)
       for (const [name, target] of saved) {
@@ -441,6 +444,37 @@ export function registerBlocks() {
       }
     },
   }
+}
+
+// โค้ดที่ยังไม่มีบล็อกรองรับ: แสดงโค้ดอ่านอย่างเดียว ให้แก้ในช่องโค้ด
+Blockly.Blocks['py_raw'] = {
+  init(this: RawBlock) {
+    this.code = ''
+    this.indent = 0
+    this.reason = ''
+    this.broken = false
+    this.setPreviousStatement(true)
+    this.setNextStatement(true)
+    this.setColour(COLORS.raw)
+    this.setTooltip('โค้ดที่ยังไม่มีบล็อกรองรับ แก้ไขได้ในช่องโค้ด Python')
+    this.updateShape()
+  },
+  saveExtraState(this: RawBlock) {
+    return { code: this.code, indent: this.indent, reason: this.reason, broken: this.broken }
+  },
+  loadExtraState(this: RawBlock, s: { code: string; indent: number; reason: string; broken?: boolean }) {
+    this.code = s.code
+    this.indent = s.indent
+    this.reason = s.reason
+    this.broken = !!s.broken
+    this.updateShape()
+  },
+  updateShape(this: RawBlock) {
+    for (const input of [...this.inputList]) this.removeInput(input.name)
+    this.setColour(this.broken ? COLORS.broken : COLORS.raw)
+    this.appendDummyInput('HEAD').appendField(this.broken ? 'โค้ดที่ไวยากรณ์ยังผิด' : 'โค้ด Python (ยังไม่มีบล็อก)')
+    reindentRaw({ kind: 'Raw', code: this.code, indent: this.indent, reason: '' }, '').forEach((l, i) => this.appendDummyInput('L' + i).appendField(new Blockly.FieldLabel(l || ' ', 'blk-code')))
+  },
 }
 
 // =============================================================
@@ -515,6 +549,10 @@ function blockStmt(b: Blockly.Block): Stmt {
       return { kind: 'Continue', id }
     case 'py_pass':
       return { kind: 'Pass', id }
+    case 'py_raw': {
+      const r = b as RawBlock
+      return { kind: 'Raw', id, code: r.code, indent: r.indent, reason: r.reason, broken: r.broken || undefined }
+    }
     default:
       throw new Error('บล็อกคำสั่งไม่รู้จัก: ' + b.type)
   }
@@ -650,6 +688,8 @@ function stmtState(s: Stmt): BlockState {
       return { type: 'py_continue' }
     case 'Pass':
       return { type: 'py_pass' }
+    case 'Raw':
+      return { type: 'py_raw', extraState: { code: s.code, indent: s.indent, reason: s.reason, broken: s.broken } }
   }
 }
 

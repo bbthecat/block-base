@@ -42,6 +42,8 @@ export type Stmt =
   | (Base & { kind: 'Break' })
   | (Base & { kind: 'Continue' })
   | (Base & { kind: 'Pass' })
+  // โค้ดนอกขอบเขตหรือไวยากรณ์ผิด เก็บข้อความเดิมทุกตัวอักษร บรรทัดที่ 2 เป็นต้นไปยังมีย่อหน้าเดิม indent ช่องจากไฟล์ต้นฉบับ
+  | (Base & { kind: 'Raw'; code: string; indent: number; reason: string; broken?: boolean })
 
 export type Module = { kind: 'Module'; body: Stmt[] }
 
@@ -49,6 +51,13 @@ export type StmtOf<K extends Stmt['kind']> = Extract<Stmt, { kind: K }>
 export type ExprOf<K extends Expr['kind']> = Extract<Expr, { kind: K }>
 
 export const HOLE_NAME = '___'
+
+/** ย้ายบรรทัดของโค้ดดิบไปย่อหน้าใหม่ บรรทัดที่ย่อหน้าน้อยกว่าตัวคำสั่ง (เช่นจากโค้ดที่ผิด) คงไว้ตามเดิม */
+export function reindentRaw(s: StmtOf<'Raw'>, pad: string): string[] {
+  return s.code.split('\n').map((l, i) =>
+    i === 0 ? pad + l : !l.trim() ? '' : l.slice(0, s.indent).trim() ? l : pad + l.slice(s.indent),
+  )
+}
 
 /** เดินทุกโหนดในต้นไม้ (pre-order) */
 export function walk(mod: Module, visit: (n: Stmt | Expr, parent: Stmt | Expr | null) => void) {

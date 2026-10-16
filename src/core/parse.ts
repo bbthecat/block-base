@@ -33,11 +33,20 @@ export function initParser(opts: {
 
 class Unsupported extends Error {
   node: Node
-  constructor(node: Node, message: string) {
+  broken: boolean // true = ไวยากรณ์ผิด ไม่ใช่แค่ยังไม่มีบล็อก
+  constructor(node: Node, message: string, broken = false) {
     super(message)
     this.node = node
+    this.broken = broken
   }
 }
+
+// Tree-sitter ยอมให้คำสงวนเป็นชื่อได้ในบางกรณี เช่น "x = \n break" กลายเป็น x = break
+const KEYWORDS = new Set([
+  'and', 'as', 'assert', 'async', 'await', 'break', 'class', 'continue', 'def', 'del', 'elif', 'else', 'except',
+  'finally', 'for', 'from', 'global', 'if', 'import', 'in', 'is', 'lambda', 'nonlocal', 'not', 'or', 'pass',
+  'raise', 'return', 'try', 'while', 'with', 'yield',
+])
 
 const line = (n: Node) => n.startPosition.row + 1
 const span = (n: Node) => ({ startLine: n.startPosition.row + 1, endLine: n.endPosition.row + 1 })
@@ -64,8 +73,8 @@ function unsupported(n: Node): never {
   throw new Unsupported(
     n,
     what
-      ? `ระบบยังไม่รองรับ${what} จึงแปลงเป็นบล็อกไม่ได้`
-      : `ระบบยังไม่รองรับโครงสร้าง "${n.text.split('\n')[0].slice(0, 40)}" จึงแปลงเป็นบล็อกไม่ได้`,
+      ? `ระบบยังไม่มีบล็อกสำหรับ${what} จึงแสดงเป็นบล็อกโค้ด แก้ไขได้ในช่องโค้ด Python`
+      : `ระบบยังไม่มีบล็อกสำหรับ "${n.text.split('\n')[0].slice(0, 40)}" จึงแสดงเป็นบล็อกโค้ด แก้ไขได้ในช่องโค้ด Python`,
   )
 }
 
@@ -77,7 +86,29 @@ function field(n: Node, name: string): Node {
 
 function body(n: Node | null): Stmt[] {
   if (!n) return []
-  return n.namedChildren.filter((c) => c.type !== 'comment').flatMap(stmt)
+  return n.namedChildren.filter((c) => c.type !== 'comment').flatMap(stmtOrRaw)
+}
+
+/** ส่วนหัวของคำสั่งผิด (ไม่นับ block ข้างใน ซึ่ง body() จะแปลงแยกทีละคำสั่งเอง) */
+function brokenHeader(n: Node): boolean {
+  if (n.type === 'ERROR' || n.isMissing) return true
+  return n.children.some((c) =>
+    c.type === 'block' ? false : c.type === 'elif_clause' || c.type === 'else_clause' ? brokenHeader(c) : c.hasError || c.isMissing,
+  )
+}
+
+/** คำสั่งที่ไวยากรณ์ผิดหรือยังไม่มีบล็อกรองรับ เก็บเป็นบล็อกโค้ดดิบ ส่วนที่เหลือยังแปลงเป็นบล็อกได้ */
+function stmtOrRaw(n: Node): Stmt[] {
+  const raw = (reason: string, broken?: boolean): Stmt[] => [
+    { kind: 'Raw', code: n.text, indent: n.startPosition.column, reason, broken, span: span(n) },
+  ]
+  if (n.hasError && brokenHeader(n)) return raw(syntaxErrors(n)[0]?.message ?? 'ไวยากรณ์ผิด', true)
+  try {
+    return stmt(n)
+  } catch (e) {
+    if (!(e instanceof Unsupported)) throw e
+    return raw(e.message, e.broken || undefined)
+  }
 }
 
 function stmt(n: Node): Stmt[] {
@@ -162,6 +193,8 @@ function expr(n: Node): Expr {
   const s = span(n)
   switch (n.type) {
     case 'identifier':
+      if (KEYWORDS.has(n.text))
+        throw new Unsupported(n, `ไวยากรณ์ผิด: "${n.text}" เป็นคำสงวนของ Python ใช้เป็นค่าหรือชื่อตัวแปรไม่ได้`, true)
       return n.text === HOLE_NAME ? { kind: 'Hole', span: s } : { kind: 'Name', name: n.text, span: s }
     case 'integer':
     case 'float':
@@ -174,7 +207,7 @@ function expr(n: Node): Expr {
       return { kind: 'Str', value: unescape(raw.map((c) => c.text).join('')), span: s }
     }
     case 'concatenated_string':
-      unsupported(n)
+      return unsupported(n)
     case 'true':
       return { kind: 'Bool', value: true, span: s }
     case 'false':
@@ -222,7 +255,7 @@ function expr(n: Node): Expr {
       if (fn.type === 'identifier') return { kind: 'Call', func: fn.text, args: a, span: s }
       if (fn.type === 'attribute')
         return { kind: 'MethodCall', obj: expr(field(fn, 'object')), method: field(fn, 'attribute').text, args: a, span: s }
-      unsupported(n)
+      return unsupported(n)
     }
     case 'list':
       return { kind: 'List', items: args(n), span: s }
@@ -273,19 +306,7 @@ export function parsePython(parser: Parser, code: string): ParseResult {
   const tree = parser.parse(code)
   try {
     const root = tree.rootNode
-    if (root.hasError) return { module: null, diagnostics: syntaxErrors(root) }
-    const diagnostics: Diagnostic[] = []
-    const stmts: Stmt[] = []
-    for (const c of root.namedChildren) {
-      if (c.type === 'comment') continue
-      try {
-        stmts.push(...stmt(c))
-      } catch (e) {
-        if (!(e instanceof Unsupported)) throw e
-        diagnostics.push({ line: line(e.node), severity: 'error', message: e.message })
-      }
-    }
-    return { module: diagnostics.length ? null : { kind: 'Module', body: stmts }, diagnostics }
+    return { module: { kind: 'Module', body: body(root) }, diagnostics: [] }
   } finally {
     tree.delete()
   }

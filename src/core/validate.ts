@@ -1,5 +1,5 @@
 // ตรวจโปรแกรมระดับ AST: ช่องว่าง, โครงสร้างไม่สมบูรณ์, ตัวแปรที่ยังไม่กำหนด, ชนิดข้อมูลไม่เข้ากัน
-import { exprChildren, type Expr, type Module, type Stmt } from './ast'
+import { exprChildren, type Expr, type Module, type Stmt, type StmtOf } from './ast'
 import type { Diagnostic } from './parse'
 
 const BUILTINS = new Set([
@@ -20,6 +20,7 @@ export function validate(mod: Module): Diagnostic[] {
 
   const functions = new Set<string>()
   mod.body.forEach((s) => s.kind === 'FunctionDef' && functions.add(s.name))
+  mod.body.forEach((s) => s.kind === 'Raw' && rawNames(s).forEach((n) => functions.add(n)))
 
   type Ctx = { defined: Set<string>; types: Map<string, Ty>; inLoop: boolean; inFunc: boolean }
 
@@ -149,6 +150,10 @@ export function validate(mod: Module): Diagnostic[] {
       case 'Continue':
         if (!ctx.inLoop) report(s, s, 'error', `${s.kind === 'Break' ? 'break' : 'continue'} ใช้ได้เฉพาะในลูป`)
         break
+      case 'Raw':
+        report(s, s, s.broken ? 'error' : 'warning', s.reason)
+        rawNames(s).forEach((n) => ctx.defined.add(n))
+        break
     }
   }
 
@@ -157,5 +162,10 @@ export function validate(mod: Module): Diagnostic[] {
 }
 
 function topLevelNames(mod: Module): string[] {
-  return mod.body.flatMap((s) => (s.kind === 'Assign' || s.kind === 'For' ? [s.target] : []))
+  return mod.body.flatMap((s) => (s.kind === 'Assign' || s.kind === 'For' ? [s.target] : s.kind === 'Raw' ? rawNames(s) : []))
+}
+
+// shortcut: นับทุกคำในโค้ดดิบว่าเป็นชื่อที่กำหนดแล้ว (เช่น import math) อาจพลาดเตือนบางกรณี ถ้าต้องแม่นขึ้นให้อ่านจาก CST
+function rawNames(s: StmtOf<'Raw'>): string[] {
+  return s.code.match(/[A-Za-z_]\w*/g) ?? []
 }
