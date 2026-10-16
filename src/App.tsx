@@ -3,6 +3,7 @@ import type Parser from 'web-tree-sitter'
 import { BlockEditor, type BlockEditorHandle } from './BlockEditor'
 import { CodeView, emptyLineState, type LineState } from './CodeView'
 import { stmtBodies, type Module, type Stmt } from './core/ast'
+import { describe } from './core/describe'
 import { generate } from './core/generate'
 import { initParser, parsePython, type Diagnostic } from './core/parse'
 import { validate } from './core/validate'
@@ -41,7 +42,7 @@ function track(e: string, data: Record<string, unknown> = {}) {
   } catch {
     log = []
   }
-  log.push({ t: new Date().toISOString(), e, ...data })
+  log.push({ t: new Date().toISOString(), pid: store.get('pid'), e, ...data })
   store.set('log', JSON.stringify(log.slice(-LOG_MAX)))
 }
 
@@ -49,7 +50,7 @@ function exportLog() {
   const blob = new Blob([store.get('log') ?? '[]'], { type: 'application/json' })
   const a = document.createElement('a')
   a.href = URL.createObjectURL(blob)
-  a.download = `saphan-log-${new Date().toISOString().slice(0, 10)}.json`
+  a.download = `saphan-log-${store.get('pid') || 'anon'}-${new Date().toISOString().slice(0, 10)}.json`
   a.click()
   URL.revokeObjectURL(a.href)
 }
@@ -87,6 +88,7 @@ export default function App() {
   const editor = useRef<BlockEditorHandle>(null)
   const parser = useRef<Parser | null>(null)
   const map = useRef<LineMap>({ lineToId: new Map(), idToSpan: new Map() })
+  const mod = useRef<Module | null>(null) // AST ล่าสุดที่มี span ใช้หาคำสั่งของบรรทัดที่เลือก
   const editTimer = useRef(0)
   const traceRef = useRef<number[]>([])
   const snapsRef = useRef<Vars[]>([]) // ค่าตัวแปรก่อนทำแต่ละก้าวใน traceRef
@@ -94,6 +96,7 @@ export default function App() {
   const replayTimer = useRef(0)
   const lastSide = useRef<'blocks' | 'code' | null>(null)
   const lessonId = useRef('')
+  const lastExercise = useRef<Lesson | null>(null)
   // นับเฉพาะตอนผู้เรียนสลับฝั่งที่แก้ ไม่ใช่ทุกการกดแป้น
   const noteSide = (side: 'blocks' | 'code') => {
     if (lastSide.current !== side) track('edit', { lesson: lessonId.current, side })
@@ -122,6 +125,8 @@ export default function App() {
   const [hasTrace, setHasTrace] = useState(false)
   const [outdated, setOutdated] = useState(false) // ผลลัพธ์เป็นของโค้ดก่อนแก้
   const [vars, setVars] = useState<VarView>(null)
+  const [tab, setTab] = useState<'out' | 'diags'>('out')
+  const [pid, setPid] = useState(() => store.get('pid'))
 
   // ค่าตัวแปร "หลัง" ทำก้าวที่ i = ค่าก่อนก้าวถัดไป จึงเห็นผลของบรรทัดที่ขบวนจอดอยู่
   const varsAt = (i: number): VarView => {
@@ -151,6 +156,7 @@ export default function App() {
       return
     }
     editor.current!.load(r.module)
+    mod.current = r.module
     map.current = buildMap(r.module, editor.current!.toAst())
     setDiags(validate(r.module).map((d) => ({ ...d, blockId: map.current.lineToId.get(d.line) })))
     setStale(false)
@@ -163,6 +169,7 @@ export default function App() {
     const ast = editor.current!.toAst()
     const next = generate(ast) // ใส่ span ลงใน ast ด้วย จึงจับคู่กับ ast ตัวเองได้เลย
     map.current = buildMap(ast, ast)
+    mod.current = ast
     setOutdated(true)
     setCheck(null)
     resetRunView()
@@ -180,6 +187,7 @@ export default function App() {
     (l: Lesson) => {
       setLesson(l)
       lessonId.current = l.id
+      if (l.id !== 'sandbox') lastExercise.current = l
       lastSide.current = null
       store.set('last', l.id)
       track('open', { lesson: l.id })
@@ -244,6 +252,7 @@ export default function App() {
     const runner = getRunner()
     resetRunView()
     setOut([])
+    setTab('out') // ช่องพิมพ์ input() อยู่ในแท็บผลลัพธ์
     setChanged(new Set())
     traceRef.current = []
     snapsRef.current = []
@@ -381,135 +390,153 @@ export default function App() {
   }, [now, visited, runError, selected, changed, diags])
 
   const errors = diags.filter((d) => d.severity === 'error').length
+  const picked = selected && mod.current ? flatten(mod.current.body).find((s) => s.span?.startLine === selected[0]) : undefined
+  const sandbox = LESSONS.find((l) => l.id === 'sandbox')!
+  const exercises = LESSONS.filter((l) => l !== sandbox)
+  const inSandbox = lesson === sandbox
+  const idx = exercises.indexOf(lesson)
+  const prev = exercises[idx - 1]
+  const next = exercises[idx + 1]
   const stages: Stage[] = ['use', 'modify', 'create']
-  const next = LESSONS[LESSONS.indexOf(lesson) + 1]
 
   return (
     <div className="app" data-stage={lesson.stage}>
+      {pid === null && (
+        <ParticipantForm
+          onDone={(v) => {
+            store.set('pid', v)
+            setPid(v)
+            track('start', { pid: v })
+          }}
+        />
+      )}
       <header className="top">
-        <div className="brand">
-          <span className="mark">
-            <Icon name="route" />
-          </span>
-          <span>สะพาน Python</span>
-        </div>
-        <div className="divider" />
-        <div className="crumb">
-          <span className={'stage-pill ' + lesson.stage}>{STAGE_LABEL[lesson.stage].th}</span>
-          <b>{lesson.title}</b>
-          <span className="lesson-no">
-            บทที่ {LESSONS.indexOf(lesson) + 1} / {LESSONS.length}
-          </span>
-        </div>
-        <div className="spacer" />
-        {hasTrace && !running && (
-          <div className="tools">
-            <button className="btn ghost" onClick={replay}>
-              <Icon name="replay" /> ทวนเส้นทาง
-            </button>
-          </div>
+        <div className="brand">สมุดฝึก Python</div>
+        <nav className="modes" aria-label="โหมด">
+          <button className={'mode' + (inSandbox ? '' : ' on')} aria-pressed={!inSandbox} onClick={() => openLesson(lastExercise.current ?? exercises[0])}>
+            แบบฝึกหัด
+          </button>
+          <button className={'mode' + (inSandbox ? ' on' : '')} aria-pressed={inSandbox} onClick={() => openLesson(sandbox)}>
+            หน้าว่าง
+          </button>
+        </nav>
+        {!inSandbox && (
+          <>
+            <div className="picker">
+              <button className="step-btn" aria-label="บทก่อนหน้า" disabled={!prev} onClick={() => prev && openLesson(prev)}>
+                ‹
+              </button>
+              <span className={'stage-chip ' + lesson.stage}>{STAGE_LABEL[lesson.stage].th}</span>
+              <label className="sr-only" htmlFor="lesson-pick">
+                เลือกบทเรียน
+              </label>
+              <select id="lesson-pick" value={lesson.id} onChange={(e) => openLesson(exercises.find((l) => l.id === e.target.value)!)}>
+                {stages.map((st) => (
+                  <optgroup key={st} label={`${STAGE_LABEL[st].th} · ${STAGE_LABEL[st].en}`}>
+                    {exercises.map((l, i) =>
+                      l.stage === st ? (
+                        <option key={l.id} value={l.id}>
+                          บท {i + 1} · {l.title}
+                          {done.has(l.id) ? ' ✓' : ''}
+                        </option>
+                      ) : null,
+                    )}
+                  </optgroup>
+                ))}
+              </select>
+              <button className="step-btn" aria-label="บทถัดไป" disabled={!next} onClick={() => next && openLesson(next)}>
+                ›
+              </button>
+            </div>
+            <span className="dots" aria-label={`ทำผ่าน ${exercises.filter((l) => done.has(l.id)).length} จาก ${exercises.length} บท`}>
+              {exercises.map((l) => (
+                <i key={l.id} className={(done.has(l.id) ? 'done' : '') + (l === lesson ? ' current' : '')} />
+              ))}
+            </span>
+          </>
         )}
+        <div className="spacer" />
+        <button className="btn export" onClick={exportLog}>
+          ส่งออกบันทึก (.json)
+        </button>
         {running ? (
-          <button className="btn primary stop" onClick={() => getRunner().stop()}>
+          <button className="btn primary run stop" onClick={() => getRunner().stop()}>
             <Icon name="stop" /> หยุด
           </button>
         ) : (
-          <button className="btn primary" onClick={run} disabled={!ready}>
+          <button className="btn primary run" onClick={run} disabled={!ready}>
             <Icon name="play" /> รัน
           </button>
         )}
       </header>
 
-      <div className="main">
-        <aside className="rail" aria-label="บทเรียน">
-          <section className="card route-card">
-          <h2 className="panel-title">เส้นทางบทเรียน</h2>
-          <nav className="route">
-            {stages.map((st) => (
-              <div key={st} className={'segment ' + st}>
-                <h3>
-                  {STAGE_LABEL[st].th} · {STAGE_LABEL[st].en}
-                </h3>
-                {LESSONS.filter((l) => l.stage === st).map((l) => (
-                  <button
-                    key={l.id}
-                    className={'stop' + (l.id === lesson.id ? ' current' : '') + (done.has(l.id) ? ' done' : '')}
-                    onClick={() => openLesson(l)}
-                    aria-current={l.id === lesson.id ? 'step' : undefined}
-                  >
-                    {l.title}
-                    {done.has(l.id) && <span className="passed">ผ่าน</span>}
-                  </button>
-                ))}
-              </div>
-            ))}
-          </nav>
-          <button className="btn text small export" onClick={exportLog}>
-            ส่งออกบันทึกการเรียน (.json)
-          </button>
-          </section>
-
-          <section className="card task">
-            <h2>{lesson.title}</h2>
-            <p className="goal">{lesson.goal}</p>
-            <ol>
-              {lesson.steps.map((s) => (
-                <li key={s}>{s}</li>
-              ))}
-            </ol>
-            {check && (
-              <div className={'verdict ' + (check.ok ? 'pass' : 'fail')} role="status">
-                {check.ok ? (
-                  <b>
-                    ถึงปลายทางแล้ว ผลลัพธ์ตรงตามโจทย์{check.total > 1 && ` ครบ ${check.total} กรณี`}
-                  </b>
-                ) : (
+      <section className="task" aria-label="โจทย์">
+        <div className="titles">
+          <h1>{lesson.title}</h1>
+          <p className="goal">{lesson.goal}</p>
+        </div>
+        <ol className="steps">
+          {lesson.steps.map((s, i) => (
+            <li key={s}>
+              <span className="n">{i + 1}</span>
+              {s}
+            </li>
+          ))}
+        </ol>
+        <div className="task-actions">
+          {lesson.tests && (
+            <button className="btn outline small" onClick={runCheck} disabled={checking || running}>
+              <Icon name="check" /> {checking ? 'กำลังตรวจ…' : 'ตรวจคำตอบ'}
+            </button>
+          )}
+          {check?.ok && next && (
+            <button className="btn primary small" onClick={() => openLesson(next)}>
+              บทถัดไป →
+            </button>
+          )}
+        </div>
+        {check && (
+          <div className={'verdict ' + (check.ok ? 'pass' : 'fail')} role="status">
+            {check.ok ? (
+              <b>
+                ถึงปลายทางแล้ว ผลลัพธ์ตรงตามโจทย์{check.total > 1 && ` ครบ ${check.total} กรณี`}
+              </b>
+            ) : (
+              <>
+                <b>
+                  ยังไม่ตรงโจทย์
+                  {check.total > 1 && ` · ผ่าน ${check.passed} จาก ${check.total} กรณี`}
+                </b>
+                {check.failed!.stdin.length > 0 && (
                   <>
-                    <b>
-                      ยังไม่ตรงโจทย์
-                      {check.total > 1 && ` · ผ่าน ${check.passed} จาก ${check.total} กรณี`}
-                    </b>
-                    {check.failed!.stdin.length > 0 && (
-                      <>
-                        <span>เมื่อป้อน</span>
-                        <pre>{check.failed!.stdin.join('\n')}</pre>
-                      </>
-                    )}
-                    {check.failed!.extra && (
-                      <>
-                        <span>เมื่อเรียก</span>
-                        <pre>{check.failed!.extra}</pre>
-                      </>
-                    )}
-                    <span>ได้</span>
-                    <pre>{check.got || '(ไม่มีผลลัพธ์)'}</pre>
-                    <span>ควรได้</span>
-                    <pre>{check.failed!.expected}</pre>
+                    <span>เมื่อป้อน</span>
+                    <pre>{check.failed!.stdin.join('\n')}</pre>
                   </>
                 )}
-              </div>
+                {check.failed!.extra && (
+                  <>
+                    <span>เมื่อเรียก</span>
+                    <pre>{check.failed!.extra}</pre>
+                  </>
+                )}
+                <span>ได้</span>
+                <pre>{check.got || '(ไม่มีผลลัพธ์)'}</pre>
+                <span>ควรได้</span>
+                <pre>{check.failed!.expected}</pre>
+              </>
             )}
-            <div className="task-actions">
-              {lesson.tests && (
-                <button className="btn outline" onClick={runCheck} disabled={checking || running}>
-                  <Icon name="check" /> {checking ? 'กำลังตรวจ…' : 'ตรวจคำตอบ'}
-                </button>
-              )}
-              {check?.ok && next && (
-                <button className="btn primary small" onClick={() => openLesson(next)}>
-                  บทถัดไป →
-                </button>
-              )}
-              <button className="btn text" onClick={restart}>
-                เริ่มใหม่
-              </button>
-            </div>
-          </section>
-        </aside>
+          </div>
+        )}
+      </section>
 
+      <div className="main">
         <section className="card blocks" aria-label="บล็อกคำสั่ง">
           <div className="panel-head">
             <h2 className="panel-title">บล็อก</h2>
+            <span className="hint">ลากจากกล่องซ้ายมาวาง</span>
+            <button className="btn text small" onClick={restart}>
+              {inSandbox ? 'ล้างหน้านี้' : 'เริ่มบทนี้ใหม่'}
+            </button>
           </div>
           <BlockEditor ref={editor} onChange={fromBlocks} onSelect={onSelectBlock} />
           {stale && (
@@ -523,13 +550,13 @@ export default function App() {
           )}
         </section>
 
-        <section className="right">
+        <section className="right" aria-label="โค้ดและผลลัพธ์">
           <div className="card code-panel" aria-label="โค้ด Python">
             <div className="panel-head">
-              <h2 className="panel-title">Python</h2>
-              <span className={'lint ' + (errors ? 'has-error' : diags.length ? 'has-warning' : 'clean')}>
+              <h2 className="panel-title">โค้ด Python</h2>
+              <button className={'lint ' + (errors ? 'has-error' : diags.length ? 'has-warning' : 'clean')} onClick={() => diags.length && setTab('diags')}>
                 {errors ? `ต้องแก้ ${errors} จุด` : diags.length ? `ข้อสังเกต ${diags.length} จุด` : 'ไม่พบปัญหา'}
-              </span>
+              </button>
             </div>
             <CodeView
               code={code}
@@ -538,61 +565,114 @@ export default function App() {
               onCursorLine={onCursorLine}
               onFocus={() => setChanged(new Set())}
             />
-            {diags.length > 0 && (
-              <ul className="diags">
-                {diags.map((d, i) => (
-                  <li key={i} className={d.severity}>
-                    <button onClick={() => (d.blockId ? editor.current!.select(d.blockId) : onCursorLine(d.line))}>
-                      <span className="at">บรรทัด {d.line}</span>
-                      {d.message}
-                    </button>
-                  </li>
-                ))}
-              </ul>
+            {picked && (
+              <p className="explain" aria-live="polite">
+                <b>บรรทัด {selected![0]}</b>
+                {describe(picked)}
+              </p>
             )}
           </div>
 
-          <div className="console" aria-label="ผลลัพธ์">
-            <div className="panel-head">
-              <h2 className="panel-title">ผลลัพธ์</h2>
-              {out.length > 0 && !running && (
+          <div className="console" aria-label="ผลการรัน">
+            <div className="panel-head" role="tablist">
+              <button role="tab" className="tab" aria-selected={tab === 'out'} onClick={() => setTab('out')}>
+                ผลลัพธ์
+              </button>
+              <button role="tab" className="tab" aria-selected={tab === 'diags'} onClick={() => setTab('diags')}>
+                ปัญหา <span className={'count' + (errors ? ' bad' : '')}>{diags.length}</span>
+              </button>
+              <span className="spacer" />
+              {hasTrace && !running && (
+                <button className="btn text small" onClick={replay}>
+                  <Icon name="replay" /> ทวนทีละบรรทัด
+                </button>
+              )}
+              {out.length > 0 && !running && tab === 'out' && (
                 <button className="btn text small" onClick={() => setOut([])}>
                   ล้าง
                 </button>
               )}
             </div>
-            {vars && <VarStrip view={vars} />}
-            <div className={'console-body' + (outdated ? ' outdated' : '')} aria-live="polite">
-              {outdated && out.length > 0 && <p className="empty">ผลลัพธ์นี้มาจากโค้ดก่อนแก้ กดรันอีกครั้ง</p>}
-              {out.length === 0 && !running && !runError && (
-                <p className="empty">กด “รัน” แล้วผลลัพธ์ของโปรแกรมจะแสดงที่นี่</p>
-              )}
-              <pre>
-                {out.map((o, i) => (
-                  <span key={i} className={o.kind}>
-                    {o.text}
-                  </span>
-                ))}
-              </pre>
-              {waiting && <InputLine onSubmit={sendInput} />}
-              {runError && (
-                <div className={'run-error' + (runError.type === 'Stopped' ? ' neutral' : '')}>
-                  <p className="what">
-                    {runError.line && <span className="at">หยุดที่บรรทัด {runError.line}</span>}
-                    {explain(runError)}
-                  </p>
-                  {runError.traceback && (
-                    <details>
-                      <summary>ข้อความจาก Python</summary>
-                      <pre>{runError.traceback}</pre>
-                    </details>
+            {tab === 'diags' ? (
+              <div className="console-body">
+                {diags.length === 0 ? (
+                  <p className="empty">ไม่พบปัญหาในโค้ด</p>
+                ) : (
+                  <ul className="diags">
+                    {diags.map((d, i) => (
+                      <li key={i} className={d.severity}>
+                        <button onClick={() => (d.blockId ? editor.current!.select(d.blockId) : onCursorLine(d.line))}>
+                          <span className="at">บรรทัด {d.line}</span>
+                          {d.message}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ) : (
+              <>
+                {vars && <VarStrip view={vars} />}
+                <div className={'console-body' + (outdated ? ' outdated' : '')} aria-live="polite">
+                  {outdated && out.length > 0 && <p className="empty">ผลลัพธ์นี้มาจากโค้ดก่อนแก้ กดรันอีกครั้ง</p>}
+                  {out.length === 0 && !running && !runError && <p className="empty">กด “รัน” แล้วผลลัพธ์ของโปรแกรมจะแสดงที่นี่</p>}
+                  <pre>
+                    {out.map((o, i) => (
+                      <span key={i} className={o.kind}>
+                        {o.text}
+                      </span>
+                    ))}
+                  </pre>
+                  {waiting && <InputLine onSubmit={sendInput} />}
+                  {runError && (
+                    <div className={'run-error' + (runError.type === 'Stopped' ? ' neutral' : '')}>
+                      <p className="what">
+                        {runError.line && <span className="at">หยุดที่บรรทัด {runError.line}</span>}
+                        {explain(runError)}
+                      </p>
+                      {runError.traceback && (
+                        <details>
+                          <summary>ข้อความจาก Python</summary>
+                          <pre>{runError.traceback}</pre>
+                        </details>
+                      )}
+                    </div>
                   )}
                 </div>
-              )}
-            </div>
+              </>
+            )}
           </div>
         </section>
       </div>
+    </div>
+  )
+}
+
+// รหัสผู้เข้าร่วมใช้จับคู่บันทึกการเรียนกับแบบทดสอบ/แบบสอบถาม ไม่เก็บชื่อจริง
+function ParticipantForm({ onDone }: { onDone(pid: string): void }) {
+  const [v, setV] = useState('')
+  return (
+    <div className="pid-overlay">
+      <form
+        className="pid-card"
+        onSubmit={(e) => {
+          e.preventDefault()
+          onDone(v.trim())
+        }}
+      >
+        <h2>ยินดีต้อนรับสู่สมุดฝึก Python</h2>
+        <label htmlFor="pid">รหัสผู้เข้าร่วม (ได้รับจากผู้วิจัย)</label>
+        <input id="pid" autoFocus value={v} onChange={(e) => setV(e.target.value)} placeholder="เช่น P01" autoComplete="off" />
+        <p>ระบบบันทึกการใช้งานไว้ในเครื่องนี้เท่านั้น จะส่งให้ผู้วิจัยเมื่อคุณกด “ส่งออกบันทึก” เอง</p>
+        <div className="pid-actions">
+          <button className="btn primary" type="submit" disabled={!v.trim()}>
+            เริ่มใช้งาน
+          </button>
+          <button className="btn text" type="button" onClick={() => onDone('')}>
+            ไม่ได้เข้าร่วมการวิจัย
+          </button>
+        </div>
+      </form>
     </div>
   )
 }

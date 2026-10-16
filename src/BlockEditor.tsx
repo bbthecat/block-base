@@ -106,9 +106,9 @@ const theme = Blockly.Theme.defineTheme('metro', {
   fontStyle: { family: '"JetBrains Mono", monospace', weight: '600', size: 13 },
   componentStyles: {
     workspaceBackgroundColour: 'transparent',
-    toolboxBackgroundColour: '#ffffff',
+    toolboxBackgroundColour: '#fdfbf3',
     toolboxForegroundColour: '#3c4150',
-    flyoutBackgroundColour: '#f6f5f1',
+    flyoutBackgroundColour: '#f4efe1',
     flyoutOpacity: 0.97,
     scrollbarColour: '#c3c8d2',
     scrollbarOpacity: 0.6,
@@ -142,14 +142,14 @@ export const BlockEditor = forwardRef<BlockEditorHandle, Props>(function BlockEd
   useEffect(() => {
     const narrow = window.innerWidth <= 720
     const w = Blockly.inject(host.current!, {
-      horizontalLayout: true,
+      horizontalLayout: narrow, // จอกว้าง: กล่องบล็อกเรียงแนวตั้งด้านซ้าย
       toolbox: TOOLBOX,
       renderer: 'signage',
       theme,
       media: './blockly-media/',
       trashcan: true,
       sounds: false,
-      grid: { spacing: 24, length: 2, colour: '#e4e2db', snap: false },
+      grid: { spacing: 24, length: 2, colour: '#d8ccb0', snap: false },
       zoom: { controls: true, wheel: false, startScale: narrow ? 0.62 : 0.82, maxScale: 1.6, minScale: 0.4, scaleSpeed: 1.15 },
       move: { scrollbars: true, drag: true, wheel: true },
     })
