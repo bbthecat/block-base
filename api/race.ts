@@ -161,7 +161,7 @@ const json = (data: unknown, status = 200) =>
 
 async function handle(fn: () => Promise<unknown>) {
   try {
-    return json(await fn())
+    return json((await fn()) ?? { ok: true })
   } catch (e) {
     if (e instanceof RaceError) return json({ error: e.message }, e.status)
     console.error(e)
